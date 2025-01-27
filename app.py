@@ -24,13 +24,16 @@ if uploaded_file:
 
     # Preprocess string columns to convert them into categorical numeric values
     def preprocess_categorical_columns(df):
+        categorical_mappings = {}  # Dictionary to store mappings of column -> categories
         for col in df.select_dtypes(include="object").columns:
-            df[col] = df[col].astype("category").cat.codes
+            df[col] = df[col].astype("category")
+            categorical_mappings[col] = dict(enumerate(df[col].cat.categories))
+            df[col] = df[col].cat.codes
         st.write(f"Converted any non integer column  to categorical values.")
-        return df
+        return df, categorical_mappings
 
-    # Apply preprocessing
-    data = preprocess_categorical_columns(data)
+    # Apply preprocessing and get the mappings
+    data, categorical_mappings = preprocess_categorical_columns(data)
     
     # Select Target and Features
     target_column = st.selectbox("Select Target Column (Price):", options=data.columns)
@@ -72,7 +75,7 @@ if uploaded_file:
         results = pd.DataFrame({"Actual": y_test, "Predicted": y_pred})
         st.line_chart(results)
 
-# Prediction Section
+# Use categorical_mappings in the prediction input section
 if st.session_state.selected_features and st.session_state.model:
     st.write("Input values for prediction:")
     
@@ -82,11 +85,21 @@ if st.session_state.selected_features and st.session_state.model:
     
     # Create input fields for each selected feature
     for feature in st.session_state.selected_features:
-        st.session_state.input_values[feature] = st.number_input(
-            f"{feature}",
-            value=st.session_state.input_values[feature],  # Persist current value
-            key=f"input_{feature}"  # Unique key for Streamlit to track inputs
-        )
+        if feature in categorical_mappings:  # If the feature is categorical
+            categories = categorical_mappings[feature]  # Get the mapping for this feature
+            st.session_state.input_values[feature] = st.selectbox(
+                f"{feature}",
+                options=list(categories.keys()),  # Numeric values (keys of the mapping)
+                format_func=lambda x: categories[x],  # Display the original category names
+                key=f"input_{feature}"
+            )
+        else:  # Numeric feature
+            st.session_state.input_values[feature] = st.number_input(
+                f"{feature}",
+                value=st.session_state.input_values[feature],
+                key=f"input_{feature}"
+            )
+
     
     # Button to make predictions
     if st.button("Predict Price"):
