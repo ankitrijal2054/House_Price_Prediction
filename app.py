@@ -16,12 +16,22 @@ st.title("House Price Predictor")
 st.write("Upload your dataset and predict house prices using selected features.")
 
 # File Upload
-uploaded_file = st.file_uploader("Upload a CSV file", type="csv")
+uploaded_file = st.file_uploader("Upload a clean CSV file", type="csv")
 if uploaded_file:
     data = pd.read_csv(uploaded_file)
     st.write("Preview of Uploaded Data:")
     st.write(data.head())
 
+    # Preprocess string columns to convert them into categorical numeric values
+    def preprocess_categorical_columns(df):
+        for col in df.select_dtypes(include="object").columns:
+            df[col] = df[col].astype("category").cat.codes
+        st.write(f"Converted any non integer column  to categorical values.")
+        return df
+
+    # Apply preprocessing
+    data = preprocess_categorical_columns(data)
+    
     # Select Target and Features
     target_column = st.selectbox("Select Target Column (Price):", options=data.columns)
     feature_columns = st.multiselect(
@@ -53,7 +63,7 @@ if uploaded_file:
         y_pred = st.session_state.model.predict(X_test)
         
         # Performance Metrics
-        rmse = root_mean_squared_error(y_test, y_pred, squared=False)
+        rmse = root_mean_squared_error(y_test, y_pred)
         r2 = r2_score(y_test, y_pred)
         st.write(f"Model Performance:\n- RMSE: {rmse:.2f}\n- R²: {r2:.2f}")
         
